@@ -29,6 +29,9 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Enhanced Input", meta=(AllowPrivateAccess = "true"))
 	class UInputAction* MoveRightAction;
 
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="000")
+	float UselessVariable{1.f};
+
 protected:
 	virtual void BeginPlay() override;
 
