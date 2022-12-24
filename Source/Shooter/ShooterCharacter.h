@@ -4,6 +4,9 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/Character.h"
+#include "InputMappingContext.h"
+#include "InputActionValue.h"
+#include "InputAction.h"
 #include "ShooterCharacter.generated.h"
 
 UCLASS()
@@ -12,18 +15,47 @@ class SHOOTER_API AShooterCharacter : public ACharacter
 	GENERATED_BODY()
 
 public:
-	// Sets default values for this character's properties
 	AShooterCharacter();
 
+	/*Enhanced Input Context for Mapping Controls*/
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Enhanced Input", meta=(AllowPrivateAccess="true"))
+	UInputMappingContext* InputContext;
+
+	/*Move Forward Input Action*/
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Enhanced Input", meta=(AllowPrivateAccess = "true"))
+	class UInputAction* MoveForwardAction;
+	
+	/*Move Right Input Action*/
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Enhanced Input", meta=(AllowPrivateAccess = "true"))
+	class UInputAction* MoveRightAction;
+
 protected:
-	// Called when the game starts or when spawned
 	virtual void BeginPlay() override;
 
-public:	
-	// Called every frame
 	virtual void Tick(float DeltaTime) override;
+	
+	void MoveForward(const FInputActionValue& Value);
+	
+	void MoveRight(const FInputActionValue& Value);
 
+public:	
 	// Called to bind functionality to input
-	virtual void SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent) override;
+	virtual void SetupPlayerInputComponent(UInputComponent* PlayerInputComponent) override;
 
+private:
+	/*Camera Boom positioning the Camera behind the Character*/
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Camera", meta=(AllowPrivateAccess="true"))
+	class USpringArmComponent* CameraBoom;
+
+	/*Camera that follows the Character*/
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Camera", meta=(AllowPrivateAccess="true"))
+	class UCameraComponent* FollowCamera;
+	
+public:
+
+	/*Returns CameraBoom subobject*/
+	FORCEINLINE USpringArmComponent* GetCameraBoom() const { return CameraBoom; }
+
+	/*Returns FollowCamera subobject*/
+	FORCEINLINE UCameraComponent* GetFollowCamera() const { return FollowCamera; }
 };
