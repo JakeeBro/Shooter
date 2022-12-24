@@ -29,8 +29,13 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Enhanced Input", meta=(AllowPrivateAccess = "true"))
 	class UInputAction* MoveRightAction;
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="000")
-	float UselessVariable{1.f};
+	/*Turn Input Action*/
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Enhanced Input", meta=(AllowPrivateAccess = "true"))
+	class UInputAction* TurnAction;
+	
+	/*Look Up / Down Input Action*/
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Enhanced Input", meta=(AllowPrivateAccess = "true"))
+	class UInputAction* LookUpAction;
 
 protected:
 	virtual void BeginPlay() override;
@@ -40,6 +45,18 @@ protected:
 	void MoveForward(const FInputActionValue& Value);
 	
 	void MoveRight(const FInputActionValue& Value);
+
+	/**
+	 * @brief Called via Input to Turn at a given Rate
+	 * @param Value Normalized
+	 */
+	void TurnAtRate(const FInputActionValue& Value);
+
+	/**
+	 * @brief Called via Input to Look Up / Down at a given Rate
+	 * @param Value Normalized
+	 */
+	void LookUpAtRate(const FInputActionValue& Value);
 
 public:	
 	// Called to bind functionality to input
@@ -53,6 +70,14 @@ private:
 	/*Camera that follows the Character*/
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Camera", meta=(AllowPrivateAccess="true"))
 	class UCameraComponent* FollowCamera;
+
+	/*Base Turn Rate, other Scaling may affect final Turn Rate*/
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Camera", meta=(AllowPrivateAccess="true"))
+	float BaseTurnRate;
+
+	/*Base Look Up / Down Rate (in Deg/s), other Scaling may affect final Turn Rate*/
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Camera", meta=(AllowPrivateAccess="true"))
+	float BaseLookUpRate;
 	
 public:
 
