@@ -10,7 +10,9 @@
 #include "EnhancedInputSubsystems.h"
 
 // Sets default values
-AShooterCharacter::AShooterCharacter()
+AShooterCharacter::AShooterCharacter() :
+	BaseTurnRate(45.f),
+	BaseLookUpRate(45.f)
 {
  	// Set this character to call Tick() every frame.  You can turn this off to improve performance if you don't need it.
 	PrimaryActorTick.bCanEverTick = true;
@@ -102,6 +104,21 @@ void AShooterCharacter::MoveRight(const FInputActionValue& Value)
 	AddMovementInput(Direction, InputValue);
 }
 
+void AShooterCharacter::TurnAtRate(const FInputActionValue& Value)
+{
+	float InputValue = Value.Get<float>();
+
+	// Calculate Delta for this Frame from the Rate Information
+	AddControllerYawInput(InputValue * BaseTurnRate * GetWorld()->GetDeltaSeconds());
+}
+
+void AShooterCharacter::LookUpAtRate(const FInputActionValue& Value)
+{
+	float InputValue = Value.Get<float>();
+
+	AddControllerPitchInput(InputValue * BaseLookUpRate * GetWorld()->GetDeltaSeconds());
+}
+
 // Called to bind functionality to input
 void AShooterCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
 {
@@ -109,6 +126,9 @@ void AShooterCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCo
 	{
 		Input->BindAction(MoveForwardAction, ETriggerEvent::Triggered, this, &AShooterCharacter::MoveForward);
 		Input->BindAction(MoveRightAction, ETriggerEvent::Triggered, this, &AShooterCharacter::MoveRight);
+
+		Input->BindAction(TurnAction, ETriggerEvent::Triggered, this, &AShooterCharacter::TurnAtRate);
+		Input->BindAction(LookUpAction, ETriggerEvent::Triggered, this, &AShooterCharacter::LookUpAtRate);
 		
 		UE_LOG(LogTemp, Warning, TEXT("Player Input Setup Complete"));
 	}
