@@ -7,6 +7,7 @@
 #include "InputMappingContext.h"
 #include "InputActionValue.h"
 #include "InputAction.h"
+#include "InputMapData.h"
 #include "ShooterCharacter.generated.h"
 
 UCLASS()
@@ -21,21 +22,8 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Enhanced Input", meta=(AllowPrivateAccess="true"))
 	UInputMappingContext* InputContext;
 
-	/*Move Forward Input Action*/
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Enhanced Input", meta=(AllowPrivateAccess = "true"))
-	class UInputAction* MoveForwardAction;
-	
-	/*Move Right Input Action*/
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Enhanced Input", meta=(AllowPrivateAccess = "true"))
-	class UInputAction* MoveRightAction;
-
-	/*Turn Input Action*/
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Enhanced Input", meta=(AllowPrivateAccess = "true"))
-	class UInputAction* TurnAction;
-	
-	/*Look Up / Down Input Action*/
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Enhanced Input", meta=(AllowPrivateAccess = "true"))
-	class UInputAction* LookUpAction;
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Enhanced Input", meta=(AllowPrivateAccess="true"))
+	UInputMapData* InputActions;
 
 protected:
 	virtual void BeginPlay() override;
@@ -57,6 +45,10 @@ protected:
 	 * @param Value Normalized
 	 */
 	void LookUpAtRate(const FInputActionValue& Value);
+
+	void Turn(const FInputActionValue& Value);
+
+	void LookUp(const FInputActionValue& Value);
 
 public:	
 	// Called to bind functionality to input

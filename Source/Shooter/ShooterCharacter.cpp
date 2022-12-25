@@ -59,9 +59,10 @@ void AShooterCharacter::BeginPlay()
 
 	const FString MyString{TEXT("My String!")};
 	UE_LOG(LogTemp, Warning, TEXT("string MyString: %s"), *MyString);
-
-	UE_LOG(LogTemp, Warning, TEXT("Instance: %s"), *GetName());
 	*/
+	
+	UE_LOG(LogTemp, Warning, TEXT("Instance: %s"), *GetName());
+	
 	
 	if (const APlayerController* PlayerController = Cast<APlayerController>(Controller))
 	{
@@ -70,6 +71,13 @@ void AShooterCharacter::BeginPlay()
 			Subsystem->AddMappingContext(InputContext, 0);
 
 			UE_LOG(LogTemp, Warning, TEXT("Mapping Context Set"));
+			
+			TArray<FEnhancedActionKeyMapping> Mappings = InputContext->GetMappings();
+
+			for (FEnhancedActionKeyMapping Mapping : Mappings)
+			{
+				UE_LOG(LogTemp, Warning, TEXT("Input Mapping Name: %s"), *Mapping.Action.GetName());
+			}
 		}
 	}
 }
@@ -119,16 +127,36 @@ void AShooterCharacter::LookUpAtRate(const FInputActionValue& Value)
 	AddControllerPitchInput(InputValue * BaseLookUpRate * GetWorld()->GetDeltaSeconds());
 }
 
+void AShooterCharacter::Turn(const FInputActionValue& Value)
+{
+	float InputValue = Value.Get<float>();
+	
+	APawn::AddControllerYawInput(InputValue);
+}
+
+void AShooterCharacter::LookUp(const FInputActionValue& Value)
+{
+	float InputValue = Value.Get<float>();
+	
+	APawn::AddControllerPitchInput(InputValue);
+}
+
 // Called to bind functionality to input
 void AShooterCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
 {
 	if (UEnhancedInputComponent* Input = CastChecked<UEnhancedInputComponent>(PlayerInputComponent))
 	{
-		Input->BindAction(MoveForwardAction, ETriggerEvent::Triggered, this, &AShooterCharacter::MoveForward);
-		Input->BindAction(MoveRightAction, ETriggerEvent::Triggered, this, &AShooterCharacter::MoveRight);
+		Input->BindAction(InputActions->MoveForwardAction, ETriggerEvent::Triggered, this, &AShooterCharacter::MoveForward);
+		Input->BindAction(InputActions->MoveRightAction, ETriggerEvent::Triggered, this, &AShooterCharacter::MoveRight);
 
-		Input->BindAction(TurnAction, ETriggerEvent::Triggered, this, &AShooterCharacter::TurnAtRate);
-		Input->BindAction(LookUpAction, ETriggerEvent::Triggered, this, &AShooterCharacter::LookUpAtRate);
+		Input->BindAction(InputActions->TurnRateAction, ETriggerEvent::Triggered, this, &AShooterCharacter::TurnAtRate);
+		Input->BindAction(InputActions->LookUpRateAction, ETriggerEvent::Triggered, this, &AShooterCharacter::LookUpAtRate);
+
+		Input->BindAction(InputActions->TurnAction, ETriggerEvent::Triggered, this, &AShooterCharacter::Turn);
+		Input->BindAction(InputActions->LookUpAction, ETriggerEvent::Triggered, this, &AShooterCharacter::LookUp);
+
+		Input->BindAction(InputActions->JumpAction, ETriggerEvent::Triggered, this, &ACharacter::Jump);
+		Input->BindAction(InputActions->JumpAction, ETriggerEvent::Canceled, this, &ACharacter::StopJumping);
 		
 		UE_LOG(LogTemp, Warning, TEXT("Player Input Setup Complete"));
 	}
