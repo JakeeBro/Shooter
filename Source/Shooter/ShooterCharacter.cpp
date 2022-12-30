@@ -8,6 +8,11 @@
 
 #include "EnhancedInputComponent.h"
 #include "EnhancedInputSubsystems.h"
+#include "Engine/SkeletalMeshSocket.h"
+#include "GameFramework/CharacterMovementComponent.h"
+#include "Kismet/GameplayStatics.h"
+#include "Particles/ParticleSystemComponent.h"
+#include "Sound/SoundCue.h"
 
 // Sets default values
 AShooterCharacter::AShooterCharacter() :
@@ -22,11 +27,24 @@ AShooterCharacter::AShooterCharacter() :
 	CameraBoom->SetupAttachment(RootComponent);
 	CameraBoom->TargetArmLength = 300.f; // The Camera follows at this Distance behind the Character
 	CameraBoom->bUsePawnControlRotation = true;	// Rotate the Arm based on the Controller
+	CameraBoom->SocketOffset = FVector(0.f, 70.f, 70.f);
 
 	// Create Follow Camera
 	FollowCamera = CreateDefaultSubobject<UCameraComponent>(TEXT("Follow Camera"));
 	FollowCamera->SetupAttachment(CameraBoom, USpringArmComponent::SocketName); // Attach Camera to End of Boom Arm
 	FollowCamera->bUsePawnControlRotation = false; // Camera does not rotate relative to arm
+
+	bUseControllerRotationPitch = false;
+	bUseControllerRotationYaw = false;	// Dont Rotate when the Controller Rotates. Let the Controller only affect the Camera
+	// bUseControllerRotationYaw = true;	// Rotate when the Controller Rotates. Let the Controller affect Movement
+	bUseControllerRotationRoll = false;
+
+	// Configure Character Movement
+	GetCharacterMovement()->bOrientRotationToMovement = true;	// Character Moves in the Direction of Input...
+	// GetCharacterMovement()->bOrientRotationToMovement = false;	// Character Moves in relation to Camera Always
+	GetCharacterMovement()->RotationRate = FRotator(0.f, 540.f, 0.f); // ...At this Rotation Rate
+	GetCharacterMovement()->JumpZVelocity = 600.f;
+	GetCharacterMovement()->AirControl = .2f;
 }
 
 // Called when the game starts or when spawned
@@ -141,6 +159,56 @@ void AShooterCharacter::LookUp(const FInputActionValue& Value)
 	APawn::AddControllerPitchInput(InputValue);
 }
 
+void AShooterCharacter::FireWeapon()
+{
+	if (FireSound)
+		UGameplayStatics::PlaySound2D(GetWorld(), FireSound);
+
+	if (const USkeletalMeshSocket* BarrelSocket = GetMesh()->GetSocketByName("BarrelSocket"))
+	{
+		const FTransform SocketTransform = BarrelSocket->GetSocketTransform(GetMesh());
+
+		if (MuzzleFlash)
+			UGameplayStatics::SpawnEmitterAtLocation(GetWorld(), MuzzleFlash, SocketTransform);
+
+		FHitResult FireHit;
+		const FVector Start{SocketTransform.GetLocation()};
+		const FQuat Rotation{SocketTransform.GetRotation()};
+		const FVector RotationAxis{Rotation.GetAxisX()};
+		const FVector End{Start + RotationAxis * 50'000.f};
+
+		FVector BeamEndPoint{End};
+		
+		GetWorld()->LineTraceSingleByChannel(FireHit, Start, End, ECC_Visibility);
+
+		if (FireHit.bBlockingHit)
+		{
+			// DrawDebugLine(GetWorld(), Start, FireHit.Location, FColor::Red, false, 2.f);
+			// DrawDebugPoint(GetWorld(), FireHit.Location, 10.f, FColor::Red, false, 2.f);
+
+			BeamEndPoint = FireHit.Location;
+
+			UE_LOG(LogTemp, Warning, TEXT("Hit: %s"), *FireHit.GetActor()->GetName());
+
+			if (ImpactParticles)
+				UGameplayStatics::SpawnEmitterAtLocation(GetWorld(), ImpactParticles, FireHit.Location);
+		}
+
+		if (BeamParticles)
+		{
+			if (UParticleSystemComponent* Beam = UGameplayStatics::SpawnEmitterAtLocation(GetWorld(), BeamParticles, SocketTransform))
+				Beam->SetVectorParameter("Target", BeamEndPoint);
+		}
+	}
+
+	if (UAnimInstance* AnimInstance = GetMesh()->GetAnimInstance())
+		if (HipFireMontage)
+		{
+			AnimInstance->Montage_Play(HipFireMontage);
+			AnimInstance->Montage_JumpToSection(FName("StartFire"));
+		}
+}
+
 // Called to bind functionality to input
 void AShooterCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
 {
@@ -157,6 +225,8 @@ void AShooterCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCo
 
 		Input->BindAction(InputActions->JumpAction, ETriggerEvent::Triggered, this, &ACharacter::Jump);
 		Input->BindAction(InputActions->JumpAction, ETriggerEvent::Canceled, this, &ACharacter::StopJumping);
+
+		Input->BindAction(InputActions->FireButtonAction, ETriggerEvent::Triggered, this, &AShooterCharacter::FireWeapon);
 		
 		UE_LOG(LogTemp, Warning, TEXT("Player Input Setup Complete"));
 	}

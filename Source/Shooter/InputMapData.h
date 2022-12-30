@@ -35,4 +35,7 @@ public:
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Enhanced Input")
 	UInputAction* JumpAction;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Enhanced Input")
+	UInputAction* FireButtonAction;
 };

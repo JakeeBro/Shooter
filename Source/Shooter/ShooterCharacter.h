@@ -50,6 +50,9 @@ protected:
 
 	void LookUp(const FInputActionValue& Value);
 
+	/*Called when the Fire Button is Pressed*/
+	void FireWeapon();
+
 public:	
 	// Called to bind functionality to input
 	virtual void SetupPlayerInputComponent(UInputComponent* PlayerInputComponent) override;
@@ -70,6 +73,26 @@ private:
 	/*Base Look Up / Down Rate (in Deg/s), other Scaling may affect final Turn Rate*/
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Camera", meta=(AllowPrivateAccess="true"))
 	float BaseLookUpRate;
+
+	/*Randomized Gunshot Sound Cue*/
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Combat", meta=(AllowPrivateAccess="true"))
+	class USoundCue* FireSound;
+
+	/*Flash Spawned at "BarrelSocket"*/
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Combat", meta=(AllowPrivateAccess="true"))
+	class UParticleSystem* MuzzleFlash;
+
+	/*Montage for Firing the Weapon*/
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Combat", meta=(AllowPrivateAccess="true"))
+	class UAnimMontage* HipFireMontage;
+
+	/*Particles Spawned upon Bullet Impact*/
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Combat", meta=(AllowPrivateAccess="true"))
+	UParticleSystem* ImpactParticles;
+
+	/*Smoke Trail for Bullets*/
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Combat", meta=(AllowPrivateAccess="true"))
+	UParticleSystem* BeamParticles;
 	
 public:
 
