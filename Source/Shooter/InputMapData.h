@@ -38,4 +38,10 @@ public:
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Enhanced Input")
 	UInputAction* FireButtonAction;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Enhanced Input")
+	UInputAction* AimStartAction;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Enhanced Input")
+	UInputAction* AimStopAction;
 };
