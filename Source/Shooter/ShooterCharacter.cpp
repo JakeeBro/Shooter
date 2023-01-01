@@ -16,8 +16,26 @@
 
 // Sets default values
 AShooterCharacter::AShooterCharacter() :
+	// Base Rates for Turning / Looking Up
 	BaseTurnRate(45.f),
-	BaseLookUpRate(45.f)
+	BaseLookUpRate(45.f),
+	// Turn Rates for Aiming / Not Aiming
+	HipTurnRate(90.f),
+	HipLookUpRate(90.f),
+	AimTurnRate(20.f),
+	AimLookUpRate(20.f),
+	// Mouse Look Sensitivity Scale Factors
+	MouseHipTurnRate(1.f),
+	MouseHipLookUpRate(1.f),
+	MouseAimTurnRate(.2f),
+	MouseAimLookUpRate(.2f),
+	// True when Aiming
+	bAiming(false),
+	// Camera FOV values
+	CameraDefaultFOV(0.f), // Set in BeginPlay()
+	CameraZoomedFOV(45.f),
+	CameraCurrentFOV(0.f),
+	ZoomInterpSpeed(20.f)
 {
  	// Set this character to call Tick() every frame.  You can turn this off to improve performance if you don't need it.
 	PrimaryActorTick.bCanEverTick = true;
@@ -25,7 +43,7 @@ AShooterCharacter::AShooterCharacter() :
 	// Create Camera Boom (Pulls in towards Character if there is a collision)
 	CameraBoom = CreateDefaultSubobject<USpringArmComponent>(TEXT("Camera Boom"));
 	CameraBoom->SetupAttachment(RootComponent);
-	CameraBoom->TargetArmLength = 300.f; // The Camera follows at this Distance behind the Character
+	CameraBoom->TargetArmLength = 250.f; // The Camera follows at this Distance behind the Character
 	CameraBoom->bUsePawnControlRotation = true;	// Rotate the Arm based on the Controller
 	CameraBoom->SocketOffset = FVector(0.f, 70.f, 70.f);
 
@@ -35,13 +53,13 @@ AShooterCharacter::AShooterCharacter() :
 	FollowCamera->bUsePawnControlRotation = false; // Camera does not rotate relative to arm
 
 	bUseControllerRotationPitch = false;
-	bUseControllerRotationYaw = false;	// Dont Rotate when the Controller Rotates. Let the Controller only affect the Camera
-	// bUseControllerRotationYaw = true;	// Rotate when the Controller Rotates. Let the Controller affect Movement
+	// bUseControllerRotationYaw = false;	// Dont Rotate when the Controller Rotates. Let the Controller only affect the Camera
+	bUseControllerRotationYaw = true;	// Rotate when the Controller Rotates. Let the Controller affect Movement
 	bUseControllerRotationRoll = false;
 
 	// Configure Character Movement
-	GetCharacterMovement()->bOrientRotationToMovement = true;	// Character Moves in the Direction of Input...
-	// GetCharacterMovement()->bOrientRotationToMovement = false;	// Character Moves in relation to Camera Always
+	// GetCharacterMovement()->bOrientRotationToMovement = true;	// Character Moves in the Direction of Input...
+	GetCharacterMovement()->bOrientRotationToMovement = false;	// Character Moves in relation to Camera Always
 	GetCharacterMovement()->RotationRate = FRotator(0.f, 540.f, 0.f); // ...At this Rotation Rate
 	GetCharacterMovement()->JumpZVelocity = 600.f;
 	GetCharacterMovement()->AirControl = .2f;
@@ -81,7 +99,6 @@ void AShooterCharacter::BeginPlay()
 	
 	UE_LOG(LogTemp, Warning, TEXT("Instance: %s"), *GetName());
 	
-	
 	if (const APlayerController* PlayerController = Cast<APlayerController>(Controller))
 	{
 		if (UEnhancedInputLocalPlayerSubsystem* Subsystem = ULocalPlayer::GetSubsystem<UEnhancedInputLocalPlayerSubsystem>(PlayerController->GetLocalPlayer()))
@@ -98,12 +115,24 @@ void AShooterCharacter::BeginPlay()
 			}
 		}
 	}
+
+	if (FollowCamera)
+	{
+		CameraDefaultFOV = GetFollowCamera()->FieldOfView;
+		CameraCurrentFOV = CameraDefaultFOV;
+	}
 }
 
 void AShooterCharacter::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
 
+	InterpolateCameraFOV(DeltaTime);
+
+	BaseTurnRate = bAiming ? AimTurnRate : HipTurnRate;
+	BaseLookUpRate = bAiming ? AimLookUpRate : HipLookUpRate;
+
+	CalculateCrosshairSpread(DeltaTime);
 }
 
 void AShooterCharacter::MoveForward(const FInputActionValue& Value)
@@ -148,15 +177,19 @@ void AShooterCharacter::LookUpAtRate(const FInputActionValue& Value)
 void AShooterCharacter::Turn(const FInputActionValue& Value)
 {
 	float InputValue = Value.Get<float>();
+
+	float TurnScaleFactor = bAiming ? MouseAimTurnRate : MouseHipTurnRate;
 	
-	APawn::AddControllerYawInput(InputValue);
+	APawn::AddControllerYawInput(InputValue * TurnScaleFactor);
 }
 
 void AShooterCharacter::LookUp(const FInputActionValue& Value)
 {
 	float InputValue = Value.Get<float>();
+
+	float LookUpScaleFactor = bAiming ? MouseAimLookUpRate : MouseHipLookUpRate;
 	
-	APawn::AddControllerPitchInput(InputValue);
+	APawn::AddControllerPitchInput(InputValue * LookUpScaleFactor);
 }
 
 void AShooterCharacter::FireWeapon()
@@ -171,35 +204,16 @@ void AShooterCharacter::FireWeapon()
 		if (MuzzleFlash)
 			UGameplayStatics::SpawnEmitterAtLocation(GetWorld(), MuzzleFlash, SocketTransform);
 
-		FHitResult FireHit;
-		const FVector Start{SocketTransform.GetLocation()};
-		const FQuat Rotation{SocketTransform.GetRotation()};
-		const FVector RotationAxis{Rotation.GetAxisX()};
-		const FVector End{Start + RotationAxis * 50'000.f};
-
-		FVector BeamEndPoint{End};
-		
-		GetWorld()->LineTraceSingleByChannel(FireHit, Start, End, ECC_Visibility);
-
-		if (FireHit.bBlockingHit)
+		if (FVector BeamEnd; GetBeamEndLocation(SocketTransform.GetLocation(), BeamEnd))
 		{
-			// DrawDebugLine(GetWorld(), Start, FireHit.Location, FColor::Red, false, 2.f);
-			// DrawDebugPoint(GetWorld(), FireHit.Location, 10.f, FColor::Red, false, 2.f);
-
-			BeamEndPoint = FireHit.Location;
-
-			UE_LOG(LogTemp, Warning, TEXT("Hit: %s"), *FireHit.GetActor()->GetName());
-
 			if (ImpactParticles)
-				UGameplayStatics::SpawnEmitterAtLocation(GetWorld(), ImpactParticles, FireHit.Location);
-		}
+				UGameplayStatics::SpawnEmitterAtLocation(GetWorld(), ImpactParticles, BeamEnd);
 
-		if (BeamParticles)
-		{
-			if (UParticleSystemComponent* Beam = UGameplayStatics::SpawnEmitterAtLocation(GetWorld(), BeamParticles, SocketTransform))
-				Beam->SetVectorParameter("Target", BeamEndPoint);
+			if (BeamParticles)
+				if (UParticleSystemComponent* Beam = UGameplayStatics::SpawnEmitterAtLocation(GetWorld(), BeamParticles, SocketTransform))
+					Beam->SetVectorParameter("Target", BeamEnd);
 		}
-	}
+	} 
 
 	if (UAnimInstance* AnimInstance = GetMesh()->GetAnimInstance())
 		if (HipFireMontage)
@@ -207,6 +221,80 @@ void AShooterCharacter::FireWeapon()
 			AnimInstance->Montage_Play(HipFireMontage);
 			AnimInstance->Montage_JumpToSection(FName("StartFire"));
 		}
+}
+
+bool AShooterCharacter::GetBeamEndLocation(const FVector& MuzzleSocketLocation, FVector& OutBeamLocation)
+{
+	// Get Current Size of the Viewport
+	FVector2D ViewportSize;
+
+	if (GEngine && GEngine->GameViewport)
+		GEngine->GameViewport->GetViewportSize(ViewportSize);
+
+	// Get Screen Space Location of the Crosshair
+	FVector2D CrosshairLocation(ViewportSize.X / 2.f, ViewportSize.Y / 2.f);
+
+	FVector CrosshairWorldPosition;
+	FVector CrosshairWorldDirection;
+
+	// Get World Position and Direction of the Crosshair
+	bool bScreenToWorld = UGameplayStatics::DeprojectScreenToWorld(
+		UGameplayStatics::GetPlayerController(
+			this, 0), CrosshairLocation, CrosshairWorldPosition, CrosshairWorldDirection);
+
+	if (bScreenToWorld) // Was Deprojection Successful?
+	{
+		FHitResult ScreenTraceHit;
+		const FVector Start{CrosshairWorldPosition};
+		const FVector End{CrosshairWorldPosition + CrosshairWorldDirection * 50'000.f};
+
+		// Set Beam End Point to Line Trace End Point
+		OutBeamLocation = End;
+
+		// Trace Outward from the Crosshair World Location
+		GetWorld()->LineTraceSingleByChannel(ScreenTraceHit, Start, End, ECC_Visibility);
+
+		if (ScreenTraceHit.bBlockingHit) // Was there a Trace Hit?
+			OutBeamLocation = ScreenTraceHit.Location; // Beam End Point is now Trace Hit Location
+
+		// Perform a Second Trace, this time from the Gun Barrel
+		FHitResult WeaponTraceHit;
+		const FVector WeaponTraceStart{MuzzleSocketLocation};
+		const FVector WeaponTraceEnd{OutBeamLocation};
+
+		GetWorld()->LineTraceSingleByChannel(WeaponTraceHit, WeaponTraceStart, WeaponTraceEnd, ECC_Visibility);
+
+		// Object between Barrel and Beam End Point
+		if (WeaponTraceHit.bBlockingHit)
+			OutBeamLocation = WeaponTraceHit.Location;
+
+		return true;
+	}
+
+	return false;
+}
+
+void AShooterCharacter::InterpolateCameraFOV(float DeltaTime)
+{
+	// Set Current Field of View
+	if (bAiming)
+		CameraCurrentFOV = FMath::FInterpTo(CameraCurrentFOV, CameraZoomedFOV, DeltaTime, ZoomInterpSpeed);
+	else
+		CameraCurrentFOV = FMath::FInterpTo(CameraCurrentFOV, CameraDefaultFOV, DeltaTime, ZoomInterpSpeed);
+
+	GetFollowCamera()->SetFieldOfView(CameraCurrentFOV);
+}
+
+void AShooterCharacter::CalculateCrosshairSpread(float DeltaTime)
+{
+	FVector2D WalkSpeedRange{0.f, GetCharacterMovement()->MaxWalkSpeed};
+	FVector2D VelocityMultiplierRange{0.f, 1.f};
+	FVector Velocity{GetVelocity()};
+	Velocity.Z = 0.f;
+
+	CrosshairVelocityFactor = FMath::GetMappedRangeValueClamped(WalkSpeedRange, VelocityMultiplierRange, Velocity.Size());
+	
+	CrosshairSpreadMultiplier = 0.5f + CrosshairVelocityFactor;
 }
 
 // Called to bind functionality to input
@@ -226,9 +314,17 @@ void AShooterCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCo
 		Input->BindAction(InputActions->JumpAction, ETriggerEvent::Triggered, this, &ACharacter::Jump);
 		Input->BindAction(InputActions->JumpAction, ETriggerEvent::Canceled, this, &ACharacter::StopJumping);
 
-		Input->BindAction(InputActions->FireButtonAction, ETriggerEvent::Triggered, this, &AShooterCharacter::FireWeapon);
+		Input->BindAction(InputActions->FireButtonAction, ETriggerEvent::Started, this, &AShooterCharacter::FireWeapon);
+
+		Input->BindAction(InputActions->AimStartAction, ETriggerEvent::Triggered, this, &AShooterCharacter::AimStart);
+		Input->BindAction(InputActions->AimStopAction, ETriggerEvent::Triggered, this, &AShooterCharacter::AimStop);
 		
 		UE_LOG(LogTemp, Warning, TEXT("Player Input Setup Complete"));
 	}
+}
+
+float AShooterCharacter::GetCrosshairSpreadMultiplier() const
+{
+	return CrosshairSpreadMultiplier;
 }
 
